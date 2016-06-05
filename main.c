@@ -4,6 +4,7 @@
 #include <sys/sysmacros.h>
 
 #include "config.h"
+#include "utils.h"
 
 #define CHECK(err) do {\
 	retval = retval | err;\
