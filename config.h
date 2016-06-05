@@ -10,3 +10,7 @@ static const int ROOT_MINOR = 1;
 static const char KERNEL_IMAGE[] = "/boot/Image";
 static const char *KERNEL_INITRD = NULL;
 static const char KERNEL_CMDLINE[] = "root=$ROOT";
+
+static const char MDEV_BIN[] = "/sbin/busybox";
+static const char *MDEV_ARGS[] = {"/sbin/mdev", "-s", NULL};
+static const unsigned int MDEV_TIMEOUT = 30;

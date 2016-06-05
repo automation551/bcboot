@@ -7,18 +7,45 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
+#include <sys/wait.h>
+
 #include "config.h"
 #include "utils.h"
 
 #define CHECK(err) do {\
+	printf(#err " \n");\
 	retval = retval | err;\
 	if (retval != 0) goto cleanup;\
 } while (0)
 
-#define FAIL(err) do { int e = err; if (e) return e; } while (0);
+#define FAIL(err) do { int e = err;\
+	printf(#err " \n");\
+       	if (e) return e; } while (0);
 
-int create_dev(unsigned int major, unsigned int minor, const char *dev) {
-	return mknod(dev, S_IFBLK | 0770, makedev(major, minor));
+void mdev_exec(char **envp) {
+	pid_t pid = fork();
+	if (pid == 0) {
+		execve(MDEV_BIN, MDEV_ARGS, envp);
+	}
+	waitpid(pid, NULL, 0);
+}
+
+int mdev(char **envp) {
+	int retval = 0;
+
+	CHECK(mount("sysfs","/sys","sysfs", MS_RELATIME, ""));
+
+	int i;
+	for (i = 0; i < MDEV_TIMEOUT; i++) {
+		mdev_exec(envp);
+		if (access(ROOT_DEV, R_OK) == 0) break;
+		sleep(1);
+	}
+
+cleanup:
+	umount("/sys");
+
+	return retval;
 }
 
 int open_write(const char *fn)
@@ -29,21 +56,14 @@ int main(int argc, char **argv, char **envp) {
 
 	/* console */
 	int ttyfd;
-	if ((ttyfd =open_write("/dev/console")) != -1) {
+	if ((ttyfd =open_write("/dev/console")) != 1) {
 		dup2(ttyfd, 0); dup2(ttyfd, 1); dup2(ttyfd, 2);
 		if (ttyfd > 2) close(ttyfd);
 	}
 
-	printf("\n\nHello World!\n");
+	printf("Booting!\n");
 
-	for (int i = 0, ret = 0; i < 30; i++) {
-		if (create_dev(ROOT_MAJOR, ROOT_MINOR, ROOT_DEV) &&
-				access(ROOT_DEV, R_OK)) {
-			goto cleanup;
-		} else {
-			sleep(1);
-		}
-	}
+	CHECK(mdev(envp));
 	CHECK(mount(ROOT_DEV, ROOT_PATH, ROOT_FS, 0, ""));
 
 	// if kernel doesn't exists
@@ -58,7 +78,7 @@ cleanup:
 	chdir("/");
 	umount(ROOT_DEV);
 	remove(ROOT_DEV);
-	//FAIL(execve(INIT_ANDROID, argv, envp));
+	FAIL(execve(INIT_ANDROID, argv, envp));
 
 	return retval;
 }
